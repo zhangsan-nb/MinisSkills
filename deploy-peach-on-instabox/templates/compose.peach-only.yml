@@ -1,0 +1,23 @@
+# No CloudDrive2 FUSE child-mount propagation. Suitable for stable local media and some Docker Desktop cases.
+# Peach official Docker image is currently linux/amd64; ARM is NOT automatically supported.
+name: peach-stack
+services:
+  peach:
+    image: longmeidao/peach:${PEACH_TAG:-edge}
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 75s
+    ports:
+      - "${PEACH_BIND:-127.0.0.1}:${PEACH_PORT:-8900}:8900"
+    volumes:
+      - type: bind
+        source: ${PEACH_DATA_ROOT:?Set an absolute persistent Peach data directory}
+        target: /data
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${MEDIA_ROOT:?Set an existing absolute stable media directory}
+        target: /media
+        read_only: true
+        bind:
+          create_host_path: false
