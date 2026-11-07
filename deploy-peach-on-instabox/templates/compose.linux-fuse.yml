@@ -1,0 +1,75 @@
+# Requires a real Linux Docker Engine, supported Peach amd64 image, and a shared host mount.
+# This is a TEMPLATE. Inspect .env and obtain approval BEFORE enabling privileged CloudDrive2.
+name: peach-stack
+services:
+  peach:
+    image: longmeidao/peach:${PEACH_TAG:-edge}
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 75s
+    ports:
+      - "${PEACH_BIND:-127.0.0.1}:${PEACH_PORT:-8900}:8900"
+    volumes:
+      - type: bind
+        source: ${PEACH_DATA_ROOT:?Set an absolute persistent Peach data directory}
+        target: /data
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${MEDIA_ROOT:?Set an existing absolute media directory}
+        target: /media
+        read_only: true
+        bind:
+          propagation: rslave
+          create_host_path: false
+    networks: [stack]
+
+  clouddrive2:
+    profiles: [clouddrive]
+    image: cloudnas/clouddrive2:${CLOUDDRIVE_TAG:-amd64}
+    restart: unless-stopped
+    # Privileged host FUSE access: user approval required. Do NOT start by default.
+    privileged: true
+    pid: host
+    devices:
+      - /dev/fuse:/dev/fuse
+    environment:
+      TZ: ${TZ:-Etc/UTC}
+      CLOUDDRIVE_HOME: /Config
+    ports:
+      - "127.0.0.1:${CLOUDDRIVE_PORT:-19798}:19798"
+    volumes:
+      - type: bind
+        source: ${CLOUDDRIVE_CONFIG_ROOT:?Set persistent CloudDrive2 Config directory}
+        target: /Config
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${MEDIA_ROOT:?Set an existing absolute media directory}
+        target: /CloudNAS
+        bind:
+          propagation: rshared
+          create_host_path: false
+    networks: [stack]
+
+  jackett:
+    profiles: [indexer]
+    image: lscr.io/linuxserver/jackett:${JACKETT_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      PUID: ${JACKETT_PUID:-1000}
+      PGID: ${JACKETT_PGID:-1000}
+      TZ: ${TZ:-Etc/UTC}
+    ports:
+      - "127.0.0.1:${JACKETT_PORT:-9117}:9117"
+    volumes:
+      - type: bind
+        source: ${JACKETT_CONFIG_ROOT:?Set persistent Jackett Config directory}
+        target: /config
+        bind:
+          create_host_path: false
+    networks: [stack]
+
+networks:
+  stack:
+    driver: bridge
